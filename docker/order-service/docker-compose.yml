@@ -1,0 +1,70 @@
+services:
+
+  product-service:
+    image: andy2025/product-service:latest
+    ports:
+      - "8081:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app_network
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/app_db
+      - SPRING_DATASOURCE_USERNAME=user
+      - SPRING_DATASOURCE_PASSWORD=password
+
+  user-service:
+    image: andy2025/user-service:latest
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app_network
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/app_db
+      - SPRING_DATASOURCE_USERNAME=user
+      - SPRING_DATASOURCE_PASSWORD=password
+
+  order-service:
+    image: andy2025/order-service:latest
+    ports:
+      - "8082:8082"
+    depends_on:
+      product-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+      db:
+        condition: service_healthy
+    networks:
+      - app_network
+    environment:
+      - USER_SERVICE_URL=http://user-service:8080/user
+      - PRODUCT_SERVICE_URL=http://product-service:8081/product
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/app_db
+      - SPRING_DATASOURCE_USERNAME=user
+      - SPRING_DATASOURCE_PASSWORD=password
+
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: app_db
+    ports:
+      - "5433:5432"
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "user", "-d", "app_db"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+
+networks:
+  app_network:
+    driver: bridge
