@@ -5,6 +5,7 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:latest
@@ -22,76 +23,79 @@ jobs:
           --health-retries=5
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        distribution: 'temurin'
-        java-version: 17
-        cache: 'maven'
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
 
-    - name: Test user-service
-      working-directory: docker/user-service
-      run: |
-        ./mvnw test
+      - name: Test user-service
+        working-directory: docker/user-service
+        run: ./mvnw test
 
-    - name: Test product-service
-      working-directory: docker/product-service
-      run: |
-        ./mvnw test
+      - name: Test product-service
+        working-directory: docker/product-service
+        run: ./mvnw test
 
-    - name: Get Git Version
-      run: echo "VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      - name: Get Git Version
+        run: echo "VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-    - name: Login to DockerHub
-      run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+      - name: Login to DockerHub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-    - name: Build and Push Images
-      run: |
-        # Build the JAR for user-service first
-        cd docker/user-service
-        ./mvnw clean package -DskipTests  # Skip tests for faster builds
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/user-service:$VERSION .
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/user-service:latest .
-        docker push ${{ secrets.DOCKER_USERNAME }}/user-service:$VERSION
-        docker push ${{ secrets.DOCKER_USERNAME }}/user-service:latest
-        
-        # Build and push product-service
-        cd ../product-service
-        ./mvnw clean package -DskipTests
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/product-service:$VERSION .
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/product-service:latest .
-        docker push ${{ secrets.DOCKER_USERNAME }}/product-service:$VERSION
-        docker push ${{ secrets.DOCKER_USERNAME }}/product-service:latest
-        
-        # Build and push order-service
-        cd ../order-service
-        ./mvnw clean package -DskipTests
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/order-service:$VERSION .
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/order-service:latest .
-        docker push ${{ secrets.DOCKER_USERNAME }}/order-service:$VERSION
-        docker push ${{ secrets.DOCKER_USERNAME }}/order-service:latest
+      - name: Build and Push Docker Images
+        run: |
+          # Build & push user-service
+          cd docker/user-service
+          ./mvnw clean package -DskipTests
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/user-service:$VERSION .
+          docker tag ${{ secrets.DOCKER_USERNAME }}/user-service:$VERSION ${{ secrets.DOCKER_USERNAME }}/user-service:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/user-service:$VERSION
+          docker push ${{ secrets.DOCKER_USERNAME }}/user-service:latest
+          
+          # Build & push product-service
+          cd ../product-service
+          ./mvnw clean package -DskipTests
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/product-service:$VERSION .
+          docker tag ${{ secrets.DOCKER_USERNAME }}/product-service:$VERSION ${{ secrets.DOCKER_USERNAME }}/product-service:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/product-service:$VERSION
+          docker push ${{ secrets.DOCKER_USERNAME }}/product-service:latest
+          
+          # Build & push order-service
+          cd ../order-service
+          ./mvnw clean package -DskipTests
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/order-service:$VERSION .
+          docker tag ${{ secrets.DOCKER_USERNAME }}/order-service:$VERSION ${{ secrets.DOCKER_USERNAME }}/order-service:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/order-service:$VERSION
+          docker push ${{ secrets.DOCKER_USERNAME }}/order-service:latest
 
-    - name: Integration test with Docker Compose
-      run: |
-        docker compose -f docker/order-service/docker-compose.yml up -d
-        docker exec order-service-order-service-1 ./mvnw test
+      - name: Integration Test with Docker Compose
+        run: |
+          docker compose -f docker/order-service/docker-compose.yml up -d
+          docker exec order-service-order-service-1 ./mvnw test
 
-    - name: Checkout ArgoCD Repo
-      uses: actions/checkout@v4
-      with:
-        repository: samahmoumen/argo1
-        token: ${{ secrets.GH_TOKEN }}
+      - name: Checkout ArgoCD Repository
+        uses: actions/checkout@v4
+        with:
+          repository: samahmoumen/argo1
+          token: ${{ secrets.GH_TOKEN }}
+          path: argo1
 
-    - name: Update ArgoCD Deployment Files
-      run: |
-        git config --global user.email "ci-bot---1@example.com"
-        git config --global user.name "ci-bot---1"
-        sed -i -e "s|.*/user-service:.*|${DOCKER_USERNAME}/user-service:$VERSION|g" user-service.yaml
-        sed -i -e "s|.*/product-service:.*|${DOCKER_USERNAME}/product-service:$VERSION|g" product-service.yaml
-        sed -i -e "s|.*/order-service:.*|${DOCKER_USERNAME}/order-service:$VERSION|g" order-service.yaml
-        git add -A
-        git commit -m "Update yaml files to $VERSION"
-        git push
+      - name: Update ArgoCD Deployment Files
+        working-directory: argo1
+        run: |
+          git config --global user.email "ci-bot---1@example.com"
+          git config --global user.name "ci-bot---1"
+          
+          # Update Docker image tags in YAML files
+          sed -i -e "s|.*/user-service:.*|${{ secrets.DOCKER_USERNAME }}/user-service:$VERSION|g" user-service.yaml
+          sed -i -e "s|.*/product-service:.*|${{ secrets.DOCKER_USERNAME }}/product-service:$VERSION|g" product-service.yaml
+          sed -i -e "s|.*/order-service:.*|${{ secrets.DOCKER_USERNAME }}/order-service:$VERSION|g" order-service.yaml
+          
+          git add -A
+          git commit -m "Update YAML files to $VERSION"
+          git push
