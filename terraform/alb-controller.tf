@@ -24,7 +24,7 @@ data "http" "AWSLoadBalancerController_json" {
 }
 
 resource "aws_iam_policy" "aws_lbc" {
-  policy = data.http.AWSLoadBalancerController_json.body
+  policy = data.http.AWSLoadBalancerController_json.response_body
   name   = "AWSLoadBalancerController"
 }
 
@@ -41,22 +41,22 @@ resource "aws_eks_pod_identity_association" "aws_lbc" {
 }
 
 resource "helm_release" "aws_lbc" {
-  name = "aws-load-balancer-controller"
-
+  name       = "aws-load-balancer-controller"
   repository = "https://aws.github.io/eks-charts"
   chart      = "aws-load-balancer-controller"
   namespace  = "kube-system"
   version    = "1.7.2"
 
-  set {
-    name  = "clusterName"
-    value = local.eks_name
-  }
-
-  set {
-    name  = "serviceAccount.name"
-    value = "aws-load-balancer-controller"
-  }
+  set = [
+    {
+      name  = "clusterName"
+      value = local.eks_name
+    },
+    {
+      name  = "serviceAccount.name"
+      value = "aws-load-balancer-controller"
+    }
+  ]
 
   depends_on = [helm_release.cluster_autoscaler]
 }

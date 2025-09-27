@@ -35,7 +35,7 @@ spec:
       containers:
 
       - name: user-service
-        image: andy2025/user-service:c2852b8
+        image: samahmn98/user-service:c2852b8
         ports:
         - containerPort: 8080
 

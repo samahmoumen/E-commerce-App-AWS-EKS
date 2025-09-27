@@ -47,7 +47,7 @@ resource "aws_iam_policy" "cluster_autoscaler" {
           "autoscaling:TerminateInstanceInAutoScalingGroup"
         ]
         Resource = "*"
-      },
+      }
     ]
   })
 }
@@ -65,28 +65,17 @@ resource "aws_eks_pod_identity_association" "cluster_autoscaler" {
 }
 
 resource "helm_release" "cluster_autoscaler" {
-  name = "autoscaler"
-
+  name       = "autoscaler"
   repository = "https://kubernetes.github.io/autoscaler"
   chart      = "cluster-autoscaler"
   namespace  = "kube-system"
   version    = "9.37.0"
 
-  set {
-    name  = "rbac.serviceAccount.name"
-    value = "cluster-autoscaler"
-  }
-
-  set {
-    name  = "autoDiscovery.clusterName"
-    value = local.eks_name
-  }
-
-  # MUST be updated to match your region 
-  set {
-    name  = "awsRegion"
-    value = local.region
-  }
+  set = [
+    { name = "rbac.serviceAccount.name", value = "cluster-autoscaler" },
+    { name = "autoDiscovery.clusterName", value = local.eks_name },
+    { name = "awsRegion", value = local.region }
+  ]
 
   depends_on = [helm_release.metrics_server]
 }

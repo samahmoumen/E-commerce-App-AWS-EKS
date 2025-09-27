@@ -1,7 +1,7 @@
 services:
 
   product-service:
-    image: andy2025/product-service:latest
+    image: samahmn98/product-service:latest
     ports:
       - "8081:8081"
     depends_on:
@@ -15,7 +15,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=password
 
   user-service:
-    image: andy2025/user-service:latest
+    image: samahmn98/user-service:latest
     ports:
       - "8080:8080"
     depends_on:
@@ -29,7 +29,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=password
 
   order-service:
-    image: andy2025/order-service:latest
+    image: samahmn98/order-service:latest
     ports:
       - "8082:8082"
     depends_on:

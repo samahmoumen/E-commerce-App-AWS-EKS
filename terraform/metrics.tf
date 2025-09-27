@@ -10,7 +10,7 @@ resource "helm_release" "metrics_server" {
   namespace  = "kube-system"
   version    = "3.12.1"
 
-  values = [data.http.metrics_server_yaml.body]
+  values = [data.http.metrics_server_yaml.response_body]
 
   depends_on = [module.eks]
 }

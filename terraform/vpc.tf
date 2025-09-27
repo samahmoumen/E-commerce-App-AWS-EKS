@@ -1,5 +1,6 @@
 module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
+  version = "~> 4.0"
 
   name = "my-vpc"
   cidr = "10.0.0.0/16"
@@ -11,7 +12,7 @@ module "vpc" {
   enable_nat_gateway = true
   single_nat_gateway = true
   enable_vpn_gateway = true
-  
+
   # create_database_subnet_group = true
 
   public_subnet_tags = {
