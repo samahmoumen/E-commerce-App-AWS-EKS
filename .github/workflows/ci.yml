@@ -8,16 +8,15 @@ jobs:
 
     services:
       postgres:
-        image: postgres:latest
+        image: postgres:15
         env:
           POSTGRES_USER: andyg
-          POSTGRES_PASSWORD: ""
+          POSTGRES_PASSWORD: mypassword123   # Non-empty password
           POSTGRES_DB: postgres
-          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U andyg"
+          --health-cmd="pg_isready -U andyg -d postgres"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -32,6 +31,13 @@ jobs:
           distribution: temurin
           java-version: 17
           cache: maven
+
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -U andyg -d postgres; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
 
       - name: Test user-service
         working-directory: docker/user-service
@@ -49,29 +55,15 @@ jobs:
 
       - name: Build and Push Docker Images
         run: |
-          # Build & push user-service
-          cd docker/user-service
-          ./mvnw clean package -DskipTests
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/user-service:$VERSION .
-          docker tag ${{ secrets.DOCKER_USERNAME }}/user-service:$VERSION ${{ secrets.DOCKER_USERNAME }}/user-service:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/user-service:$VERSION
-          docker push ${{ secrets.DOCKER_USERNAME }}/user-service:latest
-          
-          # Build & push product-service
-          cd ../product-service
-          ./mvnw clean package -DskipTests
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/product-service:$VERSION .
-          docker tag ${{ secrets.DOCKER_USERNAME }}/product-service:$VERSION ${{ secrets.DOCKER_USERNAME }}/product-service:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/product-service:$VERSION
-          docker push ${{ secrets.DOCKER_USERNAME }}/product-service:latest
-          
-          # Build & push order-service
-          cd ../order-service
-          ./mvnw clean package -DskipTests
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/order-service:$VERSION .
-          docker tag ${{ secrets.DOCKER_USERNAME }}/order-service:$VERSION ${{ secrets.DOCKER_USERNAME }}/order-service:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/order-service:$VERSION
-          docker push ${{ secrets.DOCKER_USERNAME }}/order-service:latest
+          for service in user-service product-service order-service; do
+            cd docker/$service
+            ./mvnw clean package -DskipTests
+            docker build -t ${{ secrets.DOCKER_USERNAME }}/$service:$VERSION .
+            docker tag ${{ secrets.DOCKER_USERNAME }}/$service:$VERSION ${{ secrets.DOCKER_USERNAME }}/$service:latest
+            docker push ${{ secrets.DOCKER_USERNAME }}/$service:$VERSION
+            docker push ${{ secrets.DOCKER_USERNAME }}/$service:latest
+            cd ../..
+          done
 
       - name: Integration Test with Docker Compose
         run: |
@@ -90,12 +82,12 @@ jobs:
         run: |
           git config --global user.email "ci-bot---1@example.com"
           git config --global user.name "ci-bot---1"
-          
+
           # Update Docker image tags in YAML files
-          sed -i -e "s|.*/user-service:.*|${{ secrets.DOCKER_USERNAME }}/user-service:$VERSION|g" user-service.yaml
-          sed -i -e "s|.*/product-service:.*|${{ secrets.DOCKER_USERNAME }}/product-service:$VERSION|g" product-service.yaml
-          sed -i -e "s|.*/order-service:.*|${{ secrets.DOCKER_USERNAME }}/order-service:$VERSION|g" order-service.yaml
-          
+          for service in user-service product-service order-service; do
+            sed -i -e "s|.*/$service:.*|${{ secrets.DOCKER_USERNAME }}/$service:$VERSION|g" $service.yaml
+          done
+
           git add -A
           git commit -m "Update YAML files to $VERSION"
           git push
